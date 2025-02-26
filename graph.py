@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import json
 import pandas as pd
 
-plt.rcParams['font.family'] = 'SimHei'
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = 'Times New Roman'
 plt.rcParams['font.size'] = 18
 
 def m_graph(fpos, f, bpos, b, l, n=5000):
@@ -21,23 +22,32 @@ def m_graph(fpos, f, bpos, b, l, n=5000):
         new_val = (pos_values - fpos) * f
         M_values[mask] += new_val[mask]
         
-    if 0 in critical_points:
-        del critical_points[0]
+    # 删除起始的 0
+    c_pos = list(critical_points.keys())
+    for k in c_pos:
+        if critical_points[k] == 0:
+            del critical_points[k]
         
     for bend in bends:
         mask = pos_values >= bend[0]
+                
+        if bend[0] not in critical_points:
+            critical_points[bend[0]] = M_values[mask][0]
+        elif critical_points[bend[0]] * bend[1] >= 0:
+            # 保留最大值
+            critical_points[bend[0]] += bend[1]
+            
         M_values[mask] += bend[1]
+        
         for k in critical_points.keys():
             if k > bend[0]:
                 critical_points[k] += bend[1]
-            elif k == bend[0]:
-                # 保留最大值
-                if critical_points[k] * bend[1] > 0:
-                    critical_points[k] += bend[1]
+                
+    print(critical_points)
         
     fig = plt.figure(figsize=(12, 3))
-    plt.xlabel('位置 [mm]')
-    plt.ylabel('转矩 [Nm]')
+    plt.xlabel('Position [mm]')
+    plt.ylabel('Moment [Nm]')
     plt.plot(pos_values, M_values)
     plt.xlim(0, l)
     plt.ylim(min(M_values), max(M_values))
@@ -133,10 +143,10 @@ with st.container():
             st.button(f"删除弯矩 {i}", on_click=lambda idx=i: delete_moment(idx))
 
 if st.button("开始作图"):
+    axle_length = max([f['position'] for f in st.session_state.forces] + [f['position'] for f in st.session_state.moments])
     force_pos = [f['position'] for f in st.session_state.forces]
     forces = [f['magnitude'] if f['direction'] == '下' else -f['magnitude'] for f in st.session_state.forces] # 向下的力为正
     bend_pos = [f['position'] for f in st.session_state.moments]
     bends = [f['magnitude'] if f['direction'] == '逆时针' else -f['magnitude'] for f in st.session_state.moments] # 逆时针为正
     tors_pos = []
-    axle_length = 128+89
     st.pyplot(m_graph(force_pos, forces, bend_pos, bends, axle_length))
